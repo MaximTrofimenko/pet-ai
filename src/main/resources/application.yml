@@ -16,3 +16,12 @@ spring:
   main:
     allow-circular-references: true
 
+logging:
+  level:
+    org:
+      springframework:
+        ai:
+          chat:
+            client:
+              advisor: DEBUG
+
