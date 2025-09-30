@@ -20,6 +20,8 @@ logging:
   level:
     org:
       springframework:
+        jdbc:
+          core: TRACE
         ai:
           chat:
             client:
