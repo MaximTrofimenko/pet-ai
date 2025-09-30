@@ -8,3 +8,20 @@ spring:
       chat:
         model: gemma3:4b-it-q4_K_M
 
+  datasource:
+    url: jdbc:postgresql://localhost:5432/ragdb
+    username: postgres
+    password: postgres
+
+  main:
+    allow-circular-references: true
+
+logging:
+  level:
+    org:
+      springframework:
+        ai:
+          chat:
+            client:
+              advisor: DEBUG
+
