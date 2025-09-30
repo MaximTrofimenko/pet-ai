@@ -1,13 +1,13 @@
 package com.trofimenko.petai;
 
+import com.trofimenko.petai.advisors.expansion.ExpansionQueryAdvisor;
+import com.trofimenko.petai.advisors.rag.RagAdvisor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
-import org.springframework.ai.chat.client.advisor.api.Advisor;
-import org.springframework.ai.chat.client.advisor.vectorstore.QuestionAnswerAdvisor;
+import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.prompt.PromptTemplate;
 import org.springframework.ai.ollama.api.OllamaOptions;
-import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -17,25 +17,28 @@ import org.springframework.context.annotation.Bean;
 @RequiredArgsConstructor
 public class PetAiApplication {
 
-    private static final PromptTemplate MY_PROMPT_TEMPLATE = new PromptTemplate("""
-            {query}
-            
-            Контекст:
-            ---------------------
-            {question_answer_context}
-            ---------------------
-            
-            Отвечай только на основе контекста выше. Если информации нет в контексте, сообщи, что не можешь ответить.
-            """);
+    private static final PromptTemplate SYSTEM_PROMPT = new PromptTemplate(
+            """
+                    Отвечай от первого лица, кратко и по делу.
+                    
+                    Вопрос может быть о СЛЕДСТВИИ факта из Context.
+                    ВСЕГДА связывай: факт Context → вопрос.
+                    
+                    Нет связи, даже косвенной = "Упоминания об этом отсутствуют".
+                    Есть связь = отвечай.
+                    """
+    );
 
     private final VectorStore vectorStore;
+    private final ChatModel chatModel;
 
     @Bean
     public ChatClient chatClient(ChatClient.Builder builder) {
         return builder.defaultAdvisors(
-                        SimpleLoggerAdvisor.builder().build(),
-                        getRagAdviser(),
-                        SimpleLoggerAdvisor.builder().build()
+                        ExpansionQueryAdvisor.builder(chatModel).order(0).build(),
+                        SimpleLoggerAdvisor.builder().order(1).build(),
+                        RagAdvisor.build(vectorStore).order(2).build(),
+                        SimpleLoggerAdvisor.builder().order(3).build()
                 )
                 .defaultOptions(
                         OllamaOptions.builder()
@@ -45,17 +48,7 @@ public class PetAiApplication {
                                 .repeatPenalty(1.1)
                                 .build()
                 )
-                .build();
-    }
-
-    private Advisor getRagAdviser() {
-        return QuestionAnswerAdvisor.builder(vectorStore)
-                .promptTemplate(MY_PROMPT_TEMPLATE)
-                .searchRequest(
-                        SearchRequest.builder()
-                                .topK(4)//сколько взять документов из рага (4 чанка)
-                                .similarityThreshold(0.65)//по дефолту 0.0, если 0.9 то документ похож на 90 процентов
-                                .build())
+                .defaultSystem(SYSTEM_PROMPT.render())
                 .build();
     }
 
